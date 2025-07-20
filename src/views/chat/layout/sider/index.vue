@@ -53,7 +53,7 @@ function handleClearAll() {
 // 页面刷新时初始化
 onMounted(async () => {
   await modelStore.initModelList()
-  console.log('123', modelList.value)
+  //console.log('123', modelList.value)
 })
 
 const options = computed(() =>
@@ -65,7 +65,7 @@ const options = computed(() =>
 
 // 监听选中项变化（可选）
 function handleChange(value: string) {
-  console.log('选中 provider:', value)
+  //console.log('选中 provider:', value)
   const model = modelStore.modelList.find(item => item.provider === value)
   if (model)
     modelStore.setSelected(model)

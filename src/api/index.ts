@@ -20,93 +20,129 @@ export function fetchChatConfig<T = any>() {
   })
 }
 
-export function fetchChatAPIProcess<T = any>(
-  params: {
-    prompt: string
-    options?: { conversationId?: string; parentMessageId?: string }
-    signal?: GenericAbortSignal
-    onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void },
-) {
+
+export function fetchChatAPIProcess<T = any>(params: {
+  prompt: string
+  options?: { conversationId?: string; parentMessageId?: string }
+  signal?: GenericAbortSignal
+  onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void
+}) {
   const settingStore = useSettingStore()
   const authStore = useAuthStore()
   const modelStore = useModelStore()
 
-  let data: Record<string, any> = {
+  const data: Record<string, any> = {
     prompt: params.prompt,
     options: params.options,
-  }
-
-  // if (authStore.isChatGPTAPI) {
-  //   data = {
-  //     ...data,
-  //     systemMessage: settingStore.systemMessage,
-  //     temperature: settingStore.temperature,
-  //     top_p: settingStore.top_p,
-  //   }
-  // }
-
-  if (authStore.is0GCompute) {
-    data = {
-      ...data,
-      systemMessage: settingStore.systemMessage,
-      temperature: settingStore.temperature,
-      top_p: settingStore.top_p,
-      provider: modelStore.selectedModel?.provider,  // 追加provider字段
-    }
+    systemMessage: settingStore.systemMessage,
+    temperature: settingStore.temperature,
+    top_p: settingStore.top_p,
+    provider: modelStore.selectedModel?.provider,
   }
 
   return post<T>({
     url: '/llm/ask',
     data,
     signal: params.signal,
-    onDownloadProgress: (e) => {
-      const xhr = e.event?.target
-      const { responseText } = xhr
-      console.log('💡 原始 responseText', responseText)
+    onDownloadProgress: (e: AxiosProgressEvent) => {
+      // 💡 保留响应流给组件处理，不做解析！
+      console.log('111111111111111111')
+      //console.log(e)
+      params.onDownloadProgress?.(e)
+    },
+  })
+}
+
+
+
+
+// export function fetchChatAPIProcess<T = any>(
+//   params: {
+//     prompt: string
+//     options?: { conversationId?: string; parentMessageId?: string }
+//     signal?: GenericAbortSignal
+//     onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void },
+// ) {
+//   const settingStore = useSettingStore()
+//   const authStore = useAuthStore()
+//   const modelStore = useModelStore()
+
+//   let data: Record<string, any> = {
+//     prompt: params.prompt,
+//     options: params.options,
+//   }
+
+//   // if (authStore.isChatGPTAPI) {
+//   //   data = {
+//   //     ...data,
+//   //     systemMessage: settingStore.systemMessage,
+//   //     temperature: settingStore.temperature,
+//   //     top_p: settingStore.top_p,
+//   //   }
+//   // }
+
+//   if (authStore.is0GCompute) {
+//     data = {
+//       ...data,
+//       systemMessage: settingStore.systemMessage,
+//       temperature: settingStore.temperature,
+//       top_p: settingStore.top_p,
+//       provider: modelStore.selectedModel?.provider,  // 追加provider字段
+//     }
+//   }
+
+//   return post<T>({
+//     url: '/llm/ask',
+//     data,
+//     signal: params.signal,
+//     onDownloadProgress: (e) => {
+//       const xhr = e.event?.target
+//       const { responseText } = xhr
+//       //console.log('💡 原始 responseText', responseText)
       
 
   
-      const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
-      let chunk = responseText
-      console.log('📌 解析 chunk', chunk)
-      if (lastIndex !== -1)
-        chunk = responseText.substring(lastIndex)
+//       const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
+//       let chunk = responseText
+//       //console.log('📌 解析 chunk', chunk)
+//       if (lastIndex !== -1)
+//         chunk = responseText.substring(lastIndex)
   
-      try {
-        const res = JSON.parse(chunk)
-        console.log('✅ 解析后数据', res)
+//       try {
+//         const res = JSON.parse(chunk)
+//         //console.log('✅ 解析后数据', res)
   
-        // ✅ 转换后端返回为前端预期格式
-        const transformed = {
-          text: res?.data?.choices?.[0]?.message?.content ?? '',
-          conversationId: null, // 你可以根据实际情况补充
-          id: res?.data?.id ?? Date.now().toString(), // 保留原 ID 或生成新 ID
-          detail: {
-            choices: [
-              {
-                finish_reason: res?.data?.choices?.[0]?.finish_reason ?? 'stop',
-              },
-            ],
-          },
-        }
+//         // ✅ 转换后端返回为前端预期格式
+//         const transformed = {
+//           text: res?.data?.choices?.[0]?.message?.content ?? '',
+//           conversationId: null, // 你可以根据实际情况补充
+//           id: res?.data?.id ?? Date.now().toString(), // 保留原 ID 或生成新 ID
+//           detail: {
+//             choices: [
+//               {
+//                 finish_reason: res?.data?.choices?.[0]?.finish_reason ?? 'stop',
+//               },
+//             ],
+//           },
+//         }
   
-        // 调用前端原始的回调，伪造 responseText
-        params.onDownloadProgress?.({
-          ...e,
-          event: {
-            ...e.event,
-            target: {
-              responseText: JSON.stringify(transformed),
-            },
-          },
-        })
-      } catch (err) {
-        console.warn('响应格式解析失败', err)
-      }
-    },
-  })
+//         // 调用前端原始的回调，伪造 responseText
+//         params.onDownloadProgress?.({
+//           ...e,
+//           event: {
+//             ...e.event,
+//             target: {
+//               responseText: JSON.stringify(transformed),
+//             },
+//           },
+//         })
+//       } catch (err) {
+//         console.warn('响应格式解析失败', err)
+//       }
+//     },
+//   })
   
-}
+// }
 
 export function fetchSession<T>() {
   return post<T>({

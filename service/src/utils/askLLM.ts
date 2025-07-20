@@ -16,7 +16,7 @@ export const getWalletFromEnv = (): Wallet => {
 export const fundBroker = async (signer: Wallet, amountOG: number) => {
   const broker = await createZGComputeNetworkBroker(signer);
   await broker.ledger.addLedger(amountOG); // 输入多少个0g就行 //addLedger：在合约中创建一个新的账户并存入。 depositFund：往已有账户存入
-  console.log(`💸 已存入 : ${amountOG} OG`);
+  //console.log(`💸 已存入 : ${amountOG} OG`);
 };
 
 export const getBrokerBalance = async (signer: Wallet): Promise<string> => {
@@ -24,11 +24,11 @@ export const getBrokerBalance = async (signer: Wallet): Promise<string> => {
   try {
     const account = await broker.ledger.getLedger();
     const [balance, locked] = account.ledgerInfo;
-    console.log(`
-      Balance: ${ethers.formatEther(balance)} OG
-      Locked: ${ethers.formatEther(locked)} OG
-      Available: ${ethers.formatEther(balance - locked)} OG
-    `);
+    // console.log(`
+    //   Balance: ${ethers.formatEther(balance)} OG
+    //   Locked: ${ethers.formatEther(locked)} OG
+    //   Available: ${ethers.formatEther(balance - locked)} OG
+    // `);
     return ethers.formatEther(account.ledgerInfo?.[0] ?? 0);
   } catch (e: any) {
     const reason = e?.revert?.name || e?.error?.data || e?.shortMessage;
@@ -88,10 +88,11 @@ export const askLLM = async (
   //console.log('--------------------------------------------------')
   //console.log('messages', messages)
   //console.log('--------------------------------------------------')
-  const completion = await openai.chat.completions.create(
+  const stream = await openai.chat.completions.create(
     {
       messages: messages,
       model: model,
+      stream: true,
     },
     {
       headers: {
@@ -99,17 +100,18 @@ export const askLLM = async (
       },
     }
   )
-  //console.log('completion', completion)
-  const chatID = completion.id;
-  const content = completion.choices?.[0]?.message?.content ?? '';
-  const verified = await broker.inference.processResponse(providerAddress, content, chatID);
-  //console.log('json', completion)
-  return {
-    ...completion,
-    text: content,
-    verified,
-    history: [...messages, { role: 'assistant', content }],
-  };
+  // //console.log('completion', completion)
+  // const chatID = completion.id;
+  // const content = completion.choices?.[0]?.message?.content ?? '';
+  // const verified = await broker.inference.processResponse(providerAddress, content, chatID);
+  // //console.log('json', completion)
+  // return {
+  //   ...completion,
+  //   text: content,
+  //   verified,
+  //   history: [...messages, { role: 'assistant', content }],
+  // };
+  return { stream, broker, providerAddress };
 };
 
 
@@ -166,10 +168,10 @@ export const transferFund = async (
   try {
     const broker = await createZGComputeNetworkBroker(signer);
     const amount = parseEther(fundAmount.toString()); 
-    console.log('amount (wei):', amount); // bigint 数字，如 100000000000000000n
-    console.log('amount (0g):', formatEther(amount)); // '0.1'
+    //console.log('amount (wei):', amount); // bigint 数字，如 100000000000000000n
+    //console.log('amount (0g):', formatEther(amount)); // '0.1'
     await broker.ledger.transferFund(providerAddress, "inference", amount);
-    console.log(`Transfer of ${amount} to ${providerAddress} successful.`);
+    //console.log(`Transfer of ${amount} to ${providerAddress} successful.`);
   } catch (error) {
     console.error(`Transfer to ${providerAddress} failed:`, error);
     throw error; // 可根据需求选择是否抛出
@@ -184,9 +186,9 @@ export const depositFund = async (
   try {
     const broker = await createZGComputeNetworkBroker(signer);
     const amount = parseEther(fundAmount.toString()); 
-    console.log('amount (0g):', fundAmount); // '0.1'
+    //console.log('amount (0g):', fundAmount); // '0.1'
     await broker.ledger.depositFund(fundAmount);
-    console.log(`Transfer successful.`);
+    //console.log(`Transfer successful.`);
   } catch (error) {
     console.error(`Transfer failed:`, error);
     throw error; // 可根据需求选择是否抛出

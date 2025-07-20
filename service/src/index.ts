@@ -38,6 +38,13 @@ router.post('/session', async (req, res) => {
   }
 })
 
+interface CustomDelta {
+  content?: string;
+  reasoning_content?: string;
+}
+
+
+
 router.post('/llm/ask', auth, async (req, res) => {
   try {
     const { provider, prompt, history = [], options = {}, systemMessage } = req.body;
@@ -59,33 +66,46 @@ router.post('/llm/ask', auth, async (req, res) => {
       finalHistory = [...finalHistory, ...old.filter(m => m.role !== 'system')];
     }
 
+    // 设置 response 为 SSE（Server-Sent Events）模式
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
     // 执行 LLM 调用
-    const result = await llmService.ask({
+    const { stream, broker, providerAddress } = await llmService.ask({
       provider,
       prompt,
       history: [...finalHistory],
     });
 
-    // 拼接新的历史
-    const newHistory: ChatMessage[] = [
-      ...finalHistory,
-      { role: 'user', content: prompt },
-      { role: 'assistant', content: result.text },
-    ];
+    let content = '';
+    const id = stream.id;
 
-    // 记录当前的对话（使用 completion.id 作为新 parentMessageId）
-    const newId = result.id;
-    messageStore.set(newId, newHistory);
+    for await (const chunk of stream) {
+      const jsonStr = JSON.stringify(chunk);
+      console.log('[Stream Chunk]', jsonStr);
+    
+      res.write(`data: ${jsonStr}\n\n`);
+    }
 
-    res.json({
-      status: 'Success',
-      data: {
-        ...result,
-        parentMessageId: newId, // 前端需存这个
-      },
-    });
+    //const verified = await broker.inference.processResponse(providerAddress, content, id);
+
+
+
+    res.write(`data: [DONE]\n\n`);
+    res.end();
+
+  // 保存历史
+  const newHistory: ChatMessage[] = [
+    ...finalHistory,
+    { role: 'user', content: prompt },
+    { role: 'assistant', content },
+  ];
+  messageStore.set(id, newHistory);
+
   } catch (error: any) {
-    res.status(500).json({ status: 'Fail', message: error.message || '内部错误' });
+    res.write(`event: error\ndata: ${JSON.stringify({ message: error.message || '内部错误' })}\n\n`);
+    res.end();
   }
 });
 
