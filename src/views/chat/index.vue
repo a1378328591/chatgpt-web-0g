@@ -57,6 +57,7 @@ function handleSubmit() {
 }
 
 async function onConversation() {
+  console.log('onConversation...')
   let message = prompt.value
 
   if (loading.value)
@@ -204,6 +205,7 @@ async function onConversation() {
 }
 
 async function onRegenerate(index: number) {
+  console.log('onRegenerate...')
   if (loading.value)
     return
 
@@ -521,7 +523,7 @@ onUnmounted(() => {
             </span>
           </HoverButton>
           <HoverButton @click="toggleUsingContext">
-            <span class="text-xl" :class="{ 'text-[#4b9e5f]': usingContext, 'text-[#a8071a]': !usingContext }">
+            <span class="text-xl" :class="{ 'text-[#CB8AFF]': usingContext, 'text-[#4f555e]': !usingContext }">
               <SvgIcon icon="ri:chat-history-line" />
             </span>
           </HoverButton>

@@ -1,6 +1,6 @@
 import type { AxiosProgressEvent, GenericAbortSignal } from 'axios'
-import { post } from '@/utils/request'
-import { useAuthStore, useSettingStore } from '@/store'
+import { post, get } from '@/utils/request'
+import { useAuthStore, useSettingStore, useModelStore } from '@/store'
 
 export function fetchChatAPI<T = any>(
   prompt: string,
@@ -29,32 +29,94 @@ export function fetchChatAPIProcess<T = any>(
 ) {
   const settingStore = useSettingStore()
   const authStore = useAuthStore()
+  const modelStore = useModelStore()
 
   let data: Record<string, any> = {
     prompt: params.prompt,
     options: params.options,
   }
 
-  if (authStore.isChatGPTAPI) {
+  // if (authStore.isChatGPTAPI) {
+  //   data = {
+  //     ...data,
+  //     systemMessage: settingStore.systemMessage,
+  //     temperature: settingStore.temperature,
+  //     top_p: settingStore.top_p,
+  //   }
+  // }
+
+  if (authStore.is0GCompute) {
     data = {
       ...data,
       systemMessage: settingStore.systemMessage,
       temperature: settingStore.temperature,
       top_p: settingStore.top_p,
+      provider: modelStore.selectedModel?.provider,  // 追加provider字段
     }
   }
 
   return post<T>({
-    url: '/chat-process',
+    url: '/llm/ask',
     data,
     signal: params.signal,
-    onDownloadProgress: params.onDownloadProgress,
+    onDownloadProgress: (e) => {
+      const xhr = e.event?.target
+      const { responseText } = xhr
+      console.log('💡 原始 responseText', responseText)
+      
+
+  
+      const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
+      let chunk = responseText
+      console.log('📌 解析 chunk', chunk)
+      if (lastIndex !== -1)
+        chunk = responseText.substring(lastIndex)
+  
+      try {
+        const res = JSON.parse(chunk)
+        console.log('✅ 解析后数据', res)
+  
+        // ✅ 转换后端返回为前端预期格式
+        const transformed = {
+          text: res?.data?.choices?.[0]?.message?.content ?? '',
+          conversationId: null, // 你可以根据实际情况补充
+          id: res?.data?.id ?? Date.now().toString(), // 保留原 ID 或生成新 ID
+          detail: {
+            choices: [
+              {
+                finish_reason: res?.data?.choices?.[0]?.finish_reason ?? 'stop',
+              },
+            ],
+          },
+        }
+  
+        // 调用前端原始的回调，伪造 responseText
+        params.onDownloadProgress?.({
+          ...e,
+          event: {
+            ...e.event,
+            target: {
+              responseText: JSON.stringify(transformed),
+            },
+          },
+        })
+      } catch (err) {
+        console.warn('响应格式解析失败', err)
+      }
+    },
   })
+  
 }
 
 export function fetchSession<T>() {
   return post<T>({
     url: '/session',
+  })
+}
+
+export function fetchModelsOptions<T>() {
+  return get<T>({
+    url: '/llm/models',
   })
 }
 

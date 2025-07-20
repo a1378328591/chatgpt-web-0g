@@ -1,21 +1,28 @@
 <script setup lang='ts'>
 import type { CSSProperties } from 'vue'
-import { computed, ref, watch } from 'vue'
-import { NButton, NLayoutSider, useDialog } from 'naive-ui'
+import { computed, ref, watch, onMounted } from 'vue'
+import { NButton, NLayoutSider, useDialog, NSelect } from 'naive-ui'
 import List from './List.vue'
 import Footer from './Footer.vue'
-import { useAppStore, useChatStore } from '@/store'
+import { useAppStore, useChatStore, useModelStore } from '@/store'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { PromptStore, SvgIcon } from '@/components/common'
 import { t } from '@/locales'
+import { storeToRefs } from 'pinia'
 
-const appStore = useAppStore()
+
+const appStore = useAppStore()  
 const chatStore = useChatStore()
 
 const dialog = useDialog()
 
 const { isMobile } = useBasicLayout()
 const show = ref(false)
+const modelStore = useModelStore()
+
+const { modelList } = storeToRefs(modelStore)
+// const selectedProvider = ref<string | null>(null)
+
 
 const collapsed = computed(() => appStore.siderCollapsed)
 
@@ -41,6 +48,27 @@ function handleClearAll() {
         appStore.setSiderCollapsed(true)
     },
   })
+}
+
+// 页面刷新时初始化
+onMounted(async () => {
+  await modelStore.initModelList()
+  console.log('123', modelList.value)
+})
+
+const options = computed(() =>
+  modelStore.modelList.map(item => ({
+      label: `${item.model}`,
+      value: item.provider,
+    }))
+)
+
+// 监听选中项变化（可选）
+function handleChange(value: string) {
+  console.log('选中 provider:', value)
+  const model = modelStore.modelList.find(item => item.provider === value)
+  if (model)
+    modelStore.setSelected(model)
 }
 
 const getMobileClass = computed<CSSProperties>(() => {
@@ -72,8 +100,13 @@ watch(
     flush: 'post',
   },
 )
-</script>
 
+</script>
+<style>
+.custom-select .n-base-selection-input__content {
+  color: #B75FFF !important;
+}
+</style>
 <template>
   <NLayoutSider
     :collapsed="collapsed"
@@ -98,9 +131,20 @@ watch(
         </div>
         <div class="flex items-center p-4 space-x-4">
           <div class="flex-1">
-            <NButton block @click="show = true">
+            <!-- <NButton block @click="show = true">
               {{ $t('store.siderButton') }}
-            </NButton>
+            </NButton> -->
+            <NSelect
+              :value="modelStore.selectedModel?.provider"
+              :options="options"
+              labelField="label"
+              valueField="value"
+              placeholder="请选择模型"
+              style="width: 100%; max-width: 170px;"
+              class="custom-select"
+              @update:value="handleChange"
+            >
+          </NSelect>
           </div>
           <NButton @click="handleClearAll">
             <SvgIcon icon="ri:close-circle-line" />

@@ -4,3 +4,14 @@ interface Window {
   $message?: import('naive-ui').MessageProviderInst;
   $notification?: import('naive-ui').NotificationProviderInst;
 }
+
+interface ServiceStructOutput {
+  provider: string
+  serviceType: string
+  url: string
+  inputPrice: bigint
+  outputPrice: bigint
+  updatedAt: bigint
+  model: string
+  verifiability: string
+}
