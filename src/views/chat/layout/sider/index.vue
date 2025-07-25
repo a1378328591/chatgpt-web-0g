@@ -1,17 +1,16 @@
 <script setup lang='ts'>
 import type { CSSProperties } from 'vue'
-import { computed, ref, watch, onMounted } from 'vue'
-import { NButton, NLayoutSider, useDialog, NSelect } from 'naive-ui'
+import { computed, onMounted, ref, watch } from 'vue'
+import { NButton, NLayoutSider, NSelect, useDialog } from 'naive-ui'
+import { storeToRefs } from 'pinia'
 import List from './List.vue'
 import Footer from './Footer.vue'
 import { useAppStore, useChatStore, useModelStore } from '@/store'
 import { useBasicLayout } from '@/hooks/useBasicLayout'
 import { PromptStore, SvgIcon } from '@/components/common'
 import { t } from '@/locales'
-import { storeToRefs } from 'pinia'
 
-
-const appStore = useAppStore()  
+const appStore = useAppStore()
 const chatStore = useChatStore()
 
 const dialog = useDialog()
@@ -22,7 +21,6 @@ const modelStore = useModelStore()
 
 const { modelList } = storeToRefs(modelStore)
 // const selectedProvider = ref<string | null>(null)
-
 
 const collapsed = computed(() => appStore.siderCollapsed)
 
@@ -53,19 +51,19 @@ function handleClearAll() {
 // 页面刷新时初始化
 onMounted(async () => {
   await modelStore.initModelList()
-  //console.log('123', modelList.value)
+  // console.log('123', modelList.value)
 })
 
 const options = computed(() =>
   modelStore.modelList.map(item => ({
-      label: `${item.model}`,
-      value: item.provider,
-    }))
+    label: `${item.model}`,
+    value: item.provider,
+  })),
 )
 
 // 监听选中项变化（可选）
 function handleChange(value: string) {
-  //console.log('选中 provider:', value)
+  // console.log('选中 provider:', value)
   const model = modelStore.modelList.find(item => item.provider === value)
   if (model)
     modelStore.setSelected(model)
@@ -100,13 +98,8 @@ watch(
     flush: 'post',
   },
 )
-
 </script>
-<style>
-.custom-select .n-base-selection-input__content {
-  color: #B75FFF !important;
-}
-</style>
+
 <template>
   <NLayoutSider
     :collapsed="collapsed"
@@ -129,26 +122,25 @@ watch(
         <div class="flex-1 min-h-0 pb-4 overflow-hidden">
           <List />
         </div>
-        <div class="flex items-center p-4 space-x-4">
-          <div class="flex-1">
-            <!-- <NButton block @click="show = true">
+        <div class=" p-4 space-y-2">
+          <div class="flex items-center space-x-4">
+            <NButton class="flex-1" block @click="show = true">
               {{ $t('store.siderButton') }}
-            </NButton> -->
-            <NSelect
-              :value="modelStore.selectedModel?.provider"
-              :options="options"
-              labelField="label"
-              valueField="value"
-              placeholder="请选择模型"
-              style="width: 100%; max-width: 170px;"
-              class="custom-select"
-              @update:value="handleChange"
-            >
-          </NSelect>
+            </NButton>
+            <NButton title="清空所有记录" @click="handleClearAll">
+              <SvgIcon icon="ri:close-circle-line" />
+            </NButton>
           </div>
-          <NButton @click="handleClearAll">
-            <SvgIcon icon="ri:close-circle-line" />
-          </NButton>
+          <NSelect
+            :value="modelStore.selectedModel?.provider"
+            :options="options"
+            label-field="label"
+            value-field="value"
+            placeholder="请选择模型"
+            style="width: 100%; max-width: 228px;margin-top: 5px;"
+            class="custom-select"
+            @update:value="handleChange"
+          />
         </div>
       </main>
       <Footer />
@@ -159,3 +151,9 @@ watch(
   </template>
   <PromptStore v-model:visible="show" />
 </template>
+
+<style>
+.custom-select .n-base-selection-input__content {
+  color: #B75FFF !important;
+}
+</style>

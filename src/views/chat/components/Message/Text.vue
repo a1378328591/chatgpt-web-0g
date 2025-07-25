@@ -51,14 +51,29 @@ const wrapClass = computed(() => {
   ]
 })
 
-const text = computed(() => {
-  const value = props.text ?? ''
-  if (!props.asRawText) {
-    // 对数学公式进行处理，自动添加 $$ 符号
-    const escapedText = escapeBrackets(escapeDollarNumber(value))
-    return mdi.render(escapedText)
-  }
-  return value
+// 拆分思考内容和正式回答
+const reasoningText = computed(() => {
+  if (!props.text)
+    return ''
+  const match = props.text.match(/^🤔\s\*([\s\S]*?)\*\n\n?/)
+  return match ? match[1] : ''
+})
+
+const answerText = computed(() => {
+  if (!props.text)
+    return ''
+  return props.text.replace(/^🤔\s\*([\s\S]*?)\*\n\n?/, '')
+})
+
+const reasoningHTML = computed(() => {
+  return reasoningText.value ? mdi.render(`*${reasoningText.value}*`) : ''
+})
+
+const answerHTML = computed(() => {
+  if (props.asRawText)
+    return answerText.value
+  const escaped = escapeBrackets(escapeDollarNumber(answerText.value))
+  return mdi.render(escaped)
 })
 
 function highlightBlock(str: string, lang?: string) {
@@ -139,10 +154,13 @@ onUnmounted(() => {
   <div class="text-black" :class="wrapClass">
     <div ref="textRef" class="leading-relaxed break-words">
       <div v-if="!inversion">
-        <div v-if="!asRawText" class="markdown-body" :class="{ 'markdown-body-generate': loading }" v-html="text" />
-        <div v-else class="whitespace-pre-wrap" v-text="text" />
+        <!-- 渲染 reasoning，样式弱化 -->
+        <div v-if="reasoningText" class="text-gray-500 italic text-sm border-l-4 pl-4 mb-2" v-html="reasoningHTML" />
+        <!-- 渲染正式回答 -->
+        <div v-if="!asRawText" class="markdown-body" :class="{ 'markdown-body-generate': loading }" v-html="answerHTML" />
+        <div v-else class="whitespace-pre-wrap" v-text="answerHTML" />
       </div>
-      <div v-else class="whitespace-pre-wrap" v-text="text" />
+      <div v-else class="whitespace-pre-wrap" v-text="props.text" />
     </div>
   </div>
 </template>

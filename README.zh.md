@@ -84,7 +84,7 @@ pnpm install
 ### 前端
 根目录下运行以下命令
 ```shell
-pnpm dev
+pnpm install
 ```
 
 ## 测试环境运行
@@ -102,4 +102,22 @@ pnpm dev
 ```shell
 pnpm dev
 ```
+
+## 打包
+### 前端
+
+```
+pnpm install
+pnpm build-only
+```
+### 后端
+```
+# 安装
+pnpm install
+# 打包
+pnpm build
+# 运行
+pnpm prod
+```
+
 

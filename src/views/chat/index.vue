@@ -1,6 +1,6 @@
 <script setup lang='ts'>
 import type { Ref } from 'vue'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { NAutoComplete, NButton, NInput, useDialog, useMessage } from 'naive-ui'
@@ -57,28 +57,21 @@ function handleSubmit() {
 }
 
 async function onConversation() {
-  //console.log('onConversation...')
   let message = prompt.value
 
-  if (loading.value)
-    return
-
-  if (!message || message.trim() === '')
+  if (loading.value || !message || message.trim() === '')
     return
 
   controller = new AbortController()
 
-  addChat(
-    +uuid,
-    {
-      dateTime: new Date().toLocaleString(),
-      text: message,
-      inversion: true,
-      error: false,
-      conversationOptions: null,
-      requestOptions: { prompt: message, options: null },
-    },
-  )
+  addChat(+uuid, {
+    dateTime: new Date().toLocaleString(),
+    text: message,
+    inversion: true,
+    error: false,
+    conversationOptions: null,
+    requestOptions: { prompt: message, options: null },
+  })
   scrollToBottom()
 
   loading.value = true
@@ -86,114 +79,104 @@ async function onConversation() {
 
   let options: Chat.ConversationRequest = {}
   const lastContext = conversationList.value[conversationList.value.length - 1]?.conversationOptions
-
   if (lastContext && usingContext.value)
     options = { ...lastContext }
 
-  addChat(
-    +uuid,
-    {
-      dateTime: new Date().toLocaleString(),
-      text: t('chat.thinking'),
-      loading: true,
-      inversion: false,
-      error: false,
-      conversationOptions: null,
-      requestOptions: { prompt: message, options: { ...options } },
-    },
-  )
+  addChat(+uuid, {
+    dateTime: new Date().toLocaleString(),
+    text: t('chat.thinking'),
+    loading: true,
+    inversion: false,
+    error: false,
+    conversationOptions: null,
+    requestOptions: { prompt: message, options: { ...options } },
+  })
   scrollToBottom()
 
   try {
-  let lastText = ''
-  let receivedText = ''
+    let lastText = ''
+    let lastReasoning = ''
+    let receivedText = ''
 
-  const fetchChatAPIOnce = async () => {
-    await fetchChatAPIProcess<Chat.ConversationResponse>({
-      prompt: message,
-      options,
-      signal: controller.signal,
-      onDownloadProgress: ({ event }) => {
-        console.log('2222222222222222222222222')
-        const xhr = event.target
-        const { responseText } = xhr
+    const fetchChatAPIOnce = async () => {
+      await fetchChatAPIProcess<Chat.ConversationResponse>({
+        prompt: message,
+        options,
+        signal: controller.signal,
+        onDownloadProgress: async ({ event }) => {
+          const xhr = event.target
+          const { responseText } = xhr
 
-        // 只处理尚未处理过的新部分
-        const newText = responseText.slice(receivedText.length)
-        receivedText = responseText
+          const newText = responseText.slice(receivedText.length)
+          receivedText = responseText
 
-        // 将新内容拆成多行（每行是一个 SSE 事件）
-        const lines = newText.split('\n').filter(line => line.trim().startsWith('data:'))
+          const lines = newText.split('\n').filter(line => line.trim().startsWith('data:'))
 
-        for (const line of lines) {
-          const dataStr = line.replace(/^data:\s*/, '')
-          if (!dataStr || dataStr === '[DONE]') {
-            updateChatSome(+uuid, dataSources.value.length - 1, { loading: false })
-            return
-          }
+          for (const line of lines) {
+            const dataStr = line.replace(/^data:\s*/, '')
+            if (!dataStr || dataStr === '[DONE]') {
+              updateChatSome(+uuid, dataSources.value.length - 1, { loading: false })
+              return
+            }
 
-          try {
-            const json = JSON.parse(dataStr)
-            const delta = json.choices?.[0]?.delta?.content
-            const id = json.id
-            const finishReason = json.choices?.[0]?.finish_reason
+            try {
+              const json = JSON.parse(dataStr)
+              const deltaObj = json.choices?.[0]?.delta
+              const reasoningDelta = deltaObj?.reasoning_content
+              const contentDelta = deltaObj?.content
+              const id = json.id
+              const finishReason = json.choices?.[0]?.finish_reason
 
-            if (delta) {
-              lastText += delta
-              updateChat(
-                +uuid,
-                dataSources.value.length - 1,
-                {
-                  dateTime: new Date().toLocaleString(),
-                  text: lastText, // 只渲染当前内容
-                  inversion: false,
-                  error: false,
-                  loading: true,
-                  conversationOptions: {
-                    conversationId: options?.conversationId ?? null,
-                    parentMessageId: id,
-                  },
-                  requestOptions: {
-                    prompt: message,
-                    options: { ...options },
-                  },
+              if (reasoningDelta)
+                lastReasoning += reasoningDelta
+
+              if (contentDelta)
+                lastText += contentDelta
+
+              const renderedText = (lastReasoning ? `🤔 *${lastReasoning}*\n\n` : '') + lastText
+
+              updateChat(+uuid, dataSources.value.length - 1, {
+                dateTime: new Date().toLocaleString(),
+                text: renderedText,
+                inversion: false,
+                error: false,
+                loading: true,
+                conversationOptions: {
+                  conversationId: options?.conversationId ?? undefined,
+                  parentMessageId: id,
                 },
-              )
+                requestOptions: {
+                  prompt: message,
+                  options: { ...options },
+                },
+              })
 
+              await nextTick()
               scrollToBottomIfAtBottom()
-            }
 
-            if (openLongReply && finishReason === 'length') {
-              options.parentMessageId = id
-              message = ''
-              return fetchChatAPIOnce()
+              if (openLongReply && finishReason === 'length') {
+                options.parentMessageId = id
+                message = ''
+                return fetchChatAPIOnce()
+              }
             }
-          } catch (err) {
-            console.warn('SSE 解析失败:', err)
+            catch (err) {
+              console.warn('SSE 解析失败:', err)
+            }
           }
-        }
-      },
-    })
+        },
+      })
 
-    updateChatSome(+uuid, dataSources.value.length - 1, { loading: false })
+      updateChatSome(+uuid, dataSources.value.length - 1, { loading: false })
+    }
+
+    await fetchChatAPIOnce()
   }
-
-  await fetchChatAPIOnce()
-}
-
-
-
   catch (error: any) {
     const errorMessage = error?.message ?? t('common.wrong')
 
     if (error.message === 'canceled') {
-      updateChatSome(
-        +uuid,
-        dataSources.value.length - 1,
-        {
-          loading: false,
-        },
-      )
+      updateChatSome(+uuid, dataSources.value.length - 1, { loading: false })
       scrollToBottomIfAtBottom()
       return
     }
@@ -201,31 +184,23 @@ async function onConversation() {
     const currentChat = getChatByUuidAndIndex(+uuid, dataSources.value.length - 1)
 
     if (currentChat?.text && currentChat.text !== '') {
-      updateChatSome(
-        +uuid,
-        dataSources.value.length - 1,
-        {
-          text: `${currentChat.text}\n[${errorMessage}]`,
-          error: false,
-          loading: false,
-        },
-      )
+      updateChatSome(+uuid, dataSources.value.length - 1, {
+        text: `${currentChat.text}\n[${errorMessage}]`,
+        error: false,
+        loading: false,
+      })
       return
     }
 
-    updateChat(
-      +uuid,
-      dataSources.value.length - 1,
-      {
-        dateTime: new Date().toLocaleString(),
-        text: errorMessage,
-        inversion: false,
-        error: true,
-        loading: false,
-        conversationOptions: null,
-        requestOptions: { prompt: message, options: { ...options } },
-      },
-    )
+    updateChat(+uuid, dataSources.value.length - 1, {
+      dateTime: new Date().toLocaleString(),
+      text: errorMessage,
+      inversion: false,
+      error: true,
+      loading: false,
+      conversationOptions: null,
+      requestOptions: { prompt: message, options: { ...options } },
+    })
     scrollToBottomIfAtBottom()
   }
   finally {
@@ -234,16 +209,13 @@ async function onConversation() {
 }
 
 async function onRegenerate(index: number) {
-  //console.log('onRegenerate...')
   if (loading.value)
     return
 
   controller = new AbortController()
 
   const { requestOptions } = dataSources.value[index]
-
   let message = requestOptions?.prompt ?? ''
-
   let options: Chat.ConversationRequest = {}
 
   if (requestOptions.options)
@@ -251,94 +223,112 @@ async function onRegenerate(index: number) {
 
   loading.value = true
 
-  updateChat(
-    +uuid,
-    index,
-    {
-      dateTime: new Date().toLocaleString(),
-      text: '',
-      inversion: false,
-      error: false,
-      loading: true,
-      conversationOptions: null,
-      requestOptions: { prompt: message, options: { ...options } },
-    },
-  )
+  updateChat(+uuid, index, {
+    dateTime: new Date().toLocaleString(),
+    text: t('chat.thinking'),
+    inversion: false,
+    error: false,
+    loading: true,
+    conversationOptions: null,
+    requestOptions: { prompt: message, options: { ...options } },
+  })
 
   try {
     let lastText = ''
+    let lastReasoning = ''
+    let receivedText = ''
+
     const fetchChatAPIOnce = async () => {
       await fetchChatAPIProcess<Chat.ConversationResponse>({
         prompt: message,
         options,
         signal: controller.signal,
-        onDownloadProgress: ({ event }) => {
+        onDownloadProgress: async ({ event }) => {
           const xhr = event.target
           const { responseText } = xhr
-          // Always process the final line
-          const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
-          let chunk = responseText
-          if (lastIndex !== -1)
-            chunk = responseText.substring(lastIndex)
-          try {
-            const data = JSON.parse(chunk)
-            updateChat(
-              +uuid,
-              index,
-              {
+          const newText = responseText.slice(receivedText.length)
+          receivedText = responseText
+
+          const lines = newText.split('\n').filter(line => line.trim().startsWith('data:'))
+
+          for (const line of lines) {
+            const dataStr = line.replace(/^data:\s*/, '')
+            if (!dataStr || dataStr === '[DONE]') {
+              updateChatSome(+uuid, index, { loading: false })
+              return
+            }
+
+            try {
+              const json = JSON.parse(dataStr)
+              const deltaObj = json.choices?.[0]?.delta
+              const reasoningDelta = deltaObj?.reasoning_content
+              const contentDelta = deltaObj?.content
+              const id = json.id
+              const finishReason = json.choices?.[0]?.finish_reason
+
+              if (reasoningDelta)
+                lastReasoning += reasoningDelta
+
+              if (contentDelta)
+                lastText += contentDelta
+
+              const renderedText = (lastReasoning ? `🤔 *${lastReasoning}*\n\n` : '') + lastText
+
+              updateChat(+uuid, index, {
                 dateTime: new Date().toLocaleString(),
-                text: lastText + (data.text ?? ''),
+                text: renderedText,
                 inversion: false,
                 error: false,
                 loading: true,
-                conversationOptions: { conversationId: data.conversationId, parentMessageId: data.id },
-                requestOptions: { prompt: message, options: { ...options } },
-              },
-            )
+                conversationOptions: {
+                  conversationId: options?.conversationId ?? undefined,
+                  parentMessageId: id,
+                },
+                requestOptions: {
+                  prompt: message,
+                  options: { ...options },
+                },
+              })
 
-            if (openLongReply && data.detail.choices[0].finish_reason === 'length') {
-              options.parentMessageId = data.id
-              lastText = data.text
-              message = ''
-              return fetchChatAPIOnce()
+              await nextTick()
+              scrollToBottomIfAtBottom()
+
+              // 自动触发长回复补全
+              if (openLongReply && finishReason === 'length') {
+                options.parentMessageId = id
+                message = ''
+                return fetchChatAPIOnce()
+              }
             }
-          }
-          catch (error) {
-            //
+            catch (err) {
+              console.warn('SSE 解析失败:', err)
+            }
           }
         },
       })
+
       updateChatSome(+uuid, index, { loading: false })
     }
+
     await fetchChatAPIOnce()
   }
   catch (error: any) {
     if (error.message === 'canceled') {
-      updateChatSome(
-        +uuid,
-        index,
-        {
-          loading: false,
-        },
-      )
+      updateChatSome(+uuid, index, { loading: false })
       return
     }
 
     const errorMessage = error?.message ?? t('common.wrong')
 
-    updateChat(
-      +uuid,
-      index,
-      {
-        dateTime: new Date().toLocaleString(),
-        text: errorMessage,
-        inversion: false,
-        error: true,
-        loading: false,
-        conversationOptions: null,
-        requestOptions: { prompt: message, options: { ...options } },
-      },
-    )
+    updateChat(+uuid, index, {
+      dateTime: new Date().toLocaleString(),
+      text: errorMessage,
+      inversion: false,
+      error: true,
+      loading: false,
+      conversationOptions: null,
+      requestOptions: { prompt: message, options: { ...options } },
+    })
   }
   finally {
     loading.value = false
@@ -525,7 +515,16 @@ onUnmounted(() => {
                   @delete="handleDelete(index)"
                 />
                 <div class="sticky bottom-0 left-0 flex justify-center">
-                  <NButton v-if="loading" type="warning" @click="handleStop">
+                  <NButton
+                    v-if="loading" type="warning" :style="{
+                      '--n-color': '#D5A3FF',
+                      '--n-color-hover': '#CB8AFF',
+                      '--n-text-color': '#ffffff',
+                      '--n-border': '1px solid #D5A3FF',
+                      '--n-border-hover': '1px solid #CB8AFF',
+                      '--n-color-pressed': '#CB8AFF',
+                    }" @click="handleStop"
+                  >
                     <template #icon>
                       <SvgIcon icon="ri:stop-circle-line" />
                     </template>

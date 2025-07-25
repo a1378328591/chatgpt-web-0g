@@ -1,6 +1,7 @@
 import type { AxiosProgressEvent, GenericAbortSignal } from 'axios'
-import { post, get } from '@/utils/request'
-import { useAuthStore, useSettingStore, useModelStore } from '@/store'
+import { get, post } from '@/utils/request'
+import { httpStream } from '@/utils/request/httpStream'
+import { useModelStore, useSettingStore } from '@/store'
 
 export function fetchChatAPI<T = any>(
   prompt: string,
@@ -20,6 +21,35 @@ export function fetchChatConfig<T = any>() {
   })
 }
 
+export function fetchChatAPIProcessRaw(params: {
+  prompt: string
+  options?: { conversationId?: string; parentMessageId?: string }
+  signal?: AbortSignal
+  onMessage: (msg: string) => void
+  onFinish?: () => void
+  onError?: (err: any) => void
+}) {
+  const settingStore = useSettingStore()
+  const modelStore = useModelStore()
+
+  const data = {
+    prompt: params.prompt,
+    options: params.options,
+    systemMessage: settingStore.systemMessage,
+    temperature: settingStore.temperature,
+    top_p: settingStore.top_p,
+    provider: modelStore.selectedModel?.provider,
+  }
+
+  return httpStream({
+    url: '/llm/ask',
+    data,
+    signal: params.signal,
+    onMessage: params.onMessage,
+    onFinish: params.onFinish,
+    onError: params.onError,
+  })
+}
 
 export function fetchChatAPIProcess<T = any>(params: {
   prompt: string
@@ -28,7 +58,6 @@ export function fetchChatAPIProcess<T = any>(params: {
   onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void
 }) {
   const settingStore = useSettingStore()
-  const authStore = useAuthStore()
   const modelStore = useModelStore()
 
   const data: Record<string, any> = {
@@ -46,15 +75,12 @@ export function fetchChatAPIProcess<T = any>(params: {
     signal: params.signal,
     onDownloadProgress: (e: AxiosProgressEvent) => {
       // 💡 保留响应流给组件处理，不做解析！
-      console.log('111111111111111111')
-      //console.log(e)
+      // console.log('111')
+      // console.log(e)
       params.onDownloadProgress?.(e)
     },
   })
 }
-
-
-
 
 // export function fetchChatAPIProcess<T = any>(
 //   params: {
@@ -99,19 +125,17 @@ export function fetchChatAPIProcess<T = any>(params: {
 //       const xhr = e.event?.target
 //       const { responseText } = xhr
 //       //console.log('💡 原始 responseText', responseText)
-      
 
-  
 //       const lastIndex = responseText.lastIndexOf('\n', responseText.length - 2)
 //       let chunk = responseText
 //       //console.log('📌 解析 chunk', chunk)
 //       if (lastIndex !== -1)
 //         chunk = responseText.substring(lastIndex)
-  
+
 //       try {
 //         const res = JSON.parse(chunk)
 //         //console.log('✅ 解析后数据', res)
-  
+
 //         // ✅ 转换后端返回为前端预期格式
 //         const transformed = {
 //           text: res?.data?.choices?.[0]?.message?.content ?? '',
@@ -125,7 +149,7 @@ export function fetchChatAPIProcess<T = any>(params: {
 //             ],
 //           },
 //         }
-  
+
 //         // 调用前端原始的回调，伪造 responseText
 //         params.onDownloadProgress?.({
 //           ...e,
@@ -141,7 +165,7 @@ export function fetchChatAPIProcess<T = any>(params: {
 //       }
 //     },
 //   })
-  
+
 // }
 
 export function fetchSession<T>() {
