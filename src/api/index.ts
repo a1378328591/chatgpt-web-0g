@@ -1,6 +1,6 @@
 import type { AxiosProgressEvent, GenericAbortSignal } from 'axios'
 import { get, post } from '@/utils/request'
-import { httpStream } from '@/utils/request/httpStream'
+// import { httpStream } from '@/utils/request/httpStream'
 import { useModelStore, useSettingStore } from '@/store'
 
 export function fetchChatAPI<T = any>(
@@ -21,35 +21,35 @@ export function fetchChatConfig<T = any>() {
   })
 }
 
-export function fetchChatAPIProcessRaw(params: {
-  prompt: string
-  options?: { conversationId?: string; parentMessageId?: string }
-  signal?: AbortSignal
-  onMessage: (msg: string) => void
-  onFinish?: () => void
-  onError?: (err: any) => void
-}) {
-  const settingStore = useSettingStore()
-  const modelStore = useModelStore()
+// export function fetchChatAPIProcessRaw(params: {
+//   prompt: string
+//   options?: { conversationId?: string; parentMessageId?: string }
+//   signal?: AbortSignal
+//   onMessage: (msg: string) => void
+//   onFinish?: () => void
+//   onError?: (err: any) => void
+// }) {
+//   const settingStore = useSettingStore()
+//   const modelStore = useModelStore()
 
-  const data = {
-    prompt: params.prompt,
-    options: params.options,
-    systemMessage: settingStore.systemMessage,
-    temperature: settingStore.temperature,
-    top_p: settingStore.top_p,
-    provider: modelStore.selectedModel?.provider,
-  }
+//   const data = {
+//     prompt: params.prompt,
+//     options: params.options,
+//     systemMessage: settingStore.systemMessage,
+//     temperature: settingStore.temperature,
+//     top_p: settingStore.top_p,
+//     provider: modelStore.selectedModel?.provider,
+//   }
 
-  return httpStream({
-    url: '/llm/ask',
-    data,
-    signal: params.signal,
-    onMessage: params.onMessage,
-    onFinish: params.onFinish,
-    onError: params.onError,
-  })
-}
+//   return httpStream({
+//     url: '/llm/ask',
+//     data,
+//     signal: params.signal,
+//     onMessage: params.onMessage,
+//     onFinish: params.onFinish,
+//     onError: params.onError,
+//   })
+// }
 
 export function fetchChatAPIProcess<T = any>(params: {
   prompt: string
