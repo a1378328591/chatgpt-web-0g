@@ -44,7 +44,7 @@ export const router = createRouter({
   scrollBehavior: () => ({ left: 0, top: 0 }),
 })
 
-//路由前置守卫, 为了简单的兼容， 路由调用的接口里返回接口类型吧（如0glabs）
+// 路由前置守卫, 为了简单的兼容， 路由调用的接口里返回接口类型吧（如0glabs）
 setupPageGuard(router)
 
 export async function setupRouter(app: App) {
