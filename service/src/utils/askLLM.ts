@@ -2,6 +2,7 @@ import { JsonRpcProvider, Wallet, ethers, parseEther } from 'ethers'
 // @ts-expect-error xxx
 import { createZGComputeNetworkBroker } from '@0glabs/0g-serving-broker'
 import OpenAI from 'openai'
+import { tools } from '../tools/toolSchemas'
 
 export const getWalletFromEnv = (): Wallet => {
   const provider = new JsonRpcProvider(process.env.RPC_URL!)
@@ -93,6 +94,8 @@ export const askLLM = async (
       messages,
       model,
       stream: true,
+      tool_choice: 'auto',
+      tools,
     },
     {
       headers: {
@@ -111,6 +114,7 @@ export const askLLM = async (
   //   verified,
   //   history: [...messages, { role: 'assistant', content }],
   // };
+  // console.log('stream', stream)
   return { stream, broker, providerAddress }
 }
 

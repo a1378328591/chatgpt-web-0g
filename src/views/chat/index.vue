@@ -105,6 +105,7 @@ async function onConversation() {
         signal: controller.signal,
         onDownloadProgress: async ({ event }) => {
           const xhr = event.target
+          // console.log('xhr_________', xhr)
           const { responseText } = xhr
 
           const newText = responseText.slice(receivedText.length)

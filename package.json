@@ -1,13 +1,15 @@
 {
-  "name": "chatgpt-web",
+  "name": "chatgpt-web-0g",
   "version": "2.11.1",
   "private": false,
-  "description": "ChatGPT Web",
-  "author": "ChenZhaoYu <chenzhaoyu1994@gmail.com>",
+  "description": "ChatGPT Web 0G",
+  "author": "WeiLao <weilao0113@gmail.com>",
+  "contributors": [
+    "ChenZhaoYu <chenzhaoyu1994@gmail.com> (original author)"
+  ],
   "keywords": [
     "chatgpt-web",
-    "chatgpt",
-    "chatbot",
+    "0G Compute SDK",
     "vue"
   ],
   "scripts": {
