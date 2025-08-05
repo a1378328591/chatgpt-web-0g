@@ -88,6 +88,9 @@ pnpm dev
 pnpm dev
 ```
 
+## 部署合约
+见hardhat文件夹下注释
+
 ## 打包
 ### 前端
 
