@@ -74,43 +74,62 @@ async function getPrizePool() {
 
 // 猜拳游戏
 async function playRPSGame(args: { wallet: string; move: string; amount: string }) {
-  const moveValue = moveMap[args.move]
-  const valueInWei = ethers.parseEther(args.amount)
+  try {
+    // console.log('playRPSGame start')
+    const moveValue = moveMap[args.move]
+    const valueInWei = ethers.parseEther(args.amount)
+    // console.log('playGame fragment:', contract.interface.getFunction('playGame').format());
+    // console.log('calling playGame with args:', moveValue, { value: valueInWei });
 
-  const tx = await contract.playGame(moveValue, {
-    value: valueInWei,
-  })
+    // console.log("Calling playGame with move:", moveValue)
+    // console.log("typeof move:", typeof moveValue)
+    // console.log('All contract functions:', contract.interface.fragments.map(f => f.name))
+    if (typeof moveValue !== 'number' || ![0, 1, 2].includes(moveValue))
+      throw new Error(`Invalid move: ${moveValue}`)
 
-  const receipt = await tx.wait()
+    // console.log('typeof contract.playGame:', typeof contract.playGame)
+    // console.log('contract.playGame.toString:', contract.playGame?.toString?.() ?? 'undefined')
 
-  // 解析事件
-  const event = receipt.logs
-    .map((log: any) => {
-      try {
-        return contract.interface.parseLog(log)
-      }
-      catch {
-        return null
-      }
+    const tx = await contract.playGame(moveValue, {
+      value: valueInWei,
+      gasLimit: 30000000,
     })
-    .find(e => e?.name === 'GameResult')
 
-  if (!event)
-    throw new Error('GameResult event not found')
+    const receipt = await tx.wait()
 
-  const { user, userMove, contractMove, result, amountWon } = event.args
+    // 解析事件
+    const event = receipt.logs
+      .map((log: any) => {
+        try {
+          return contract.interface.parseLog(log)
+        }
+        catch {
+          return null
+        }
+      })
+      .find(e => e?.name === 'GameResult')
 
-  const prizePoolAfter = await contract.prizePool()
+    if (!event)
+      throw new Error('GameResult event not found')
 
-  return {
-    wallet: user,
-    userMove: Object.keys(moveMap)[userMove],
-    contractMove: Object.keys(moveMap)[contractMove],
-    result: ['Draw', 'UserWin', 'ContractWin'][result],
-    amountWon: ethers.formatEther(amountWon),
-    currentPrizePoolEth: ethers.formatEther(prizePoolAfter),
-    userBalance: await getWalletBalance(),
-    symbol: '0G',
+    const { user, userMove, contractMove, result, amountWon } = event.args
+
+    const prizePoolAfter = await contract.prizePool()
+    // console.log('playRPSGame', receipt)
+    return {
+      wallet: user,
+      userMove: Object.keys(moveMap)[userMove],
+      contractMove: Object.keys(moveMap)[contractMove],
+      result: ['Draw', 'UserWin', 'ContractWin'][result],
+      amountWon: ethers.formatEther(amountWon),
+      currentPrizePoolEth: ethers.formatEther(prizePoolAfter),
+      userBalance: await getWalletBalance(),
+      symbol: '0G',
+    }
+  }
+  catch (err) {
+    // console.error('playRPSGame error:', err)
+    // throw err // 如果你需要调用处处理错误，也可以继续抛出
   }
 }
 
