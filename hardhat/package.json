@@ -1,11 +1,12 @@
 {
   "name": "0g-hardhat",
+  "type": "module",
   "version": "1.0.0",
   "description": "",
   "author": "",
   "license": "ISC",
   "keywords": [],
-  "main": "hardhat.config.js",
+  "main": "hardhat.config.mjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

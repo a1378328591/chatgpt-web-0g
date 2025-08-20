@@ -73,4 +73,21 @@ export const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'withdraw_prize_pool',
+      description: '合约拥有者提现奖池（只有 owner 可调用）',
+      parameters: {
+        type: 'object',
+        properties: {
+          amount: {
+            type: 'number',
+            description: '提现金额，单位 0G（小数，例如 0.01）',
+          },
+        },
+        required: ['amount'],
+      },
+    },
+  },
 ]

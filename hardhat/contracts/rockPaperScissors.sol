@@ -8,7 +8,7 @@ contract RockPaperScissors {
     enum Result { Draw, UserWin, ContractWin }
 
     address public owner;
-    uint public minimumBet = 0.01 ether;  // 最低下注金额
+    uint public minimumBet = 0.00001 ether;  // 最低下注金额
 
     // 奖池余额
     uint public prizePool;

@@ -1,4 +1,5 @@
 // src/llmService.ts
+import { Readable } from 'stream'
 import { JsonRpcProvider, Wallet } from 'ethers'
 import dotenv from 'dotenv'
 import type OpenAI from 'openai'
@@ -28,51 +29,76 @@ class LLMService {
     prompt: string
     history: { role: 'user' | 'system' | 'assistant'; content: string }[]
   }) {
-    const messages = [...input.history, { role: 'user', content: input.prompt }]
+    try {
+      const messages = [...input.history, { role: 'user', content: input.prompt }]
 
-    const { stream } = await askLLM(this.wallet, input.provider, input.prompt, input.history)
+      const { stream } = await askLLM(this.wallet, input.provider, input.prompt, input.history)
 
-    const streamIter = stream[Symbol.asyncIterator]()
+      const streamIter = stream[Symbol.asyncIterator]()
 
-    const peekedParts: any[] = []
-    let hasToolCalls = false
-    let peekLimit = 3
+      const peekedParts: any[] = []
+      let hasToolCalls = false
+      let peekLimit = 3
 
-    while (peekLimit-- > 0) {
-      const { value, done } = await streamIter.next()
-      if (done || !value)
-        break
+      while (peekLimit-- > 0) {
+        const { value, done } = await streamIter.next()
+        if (done || !value)
+          break
 
-      peekedParts.push(value)
+        peekedParts.push(value)
 
-      const delta = value.choices?.[0]?.delta
-      // console.log('delta', delta)
-      if (!delta)
-        continue
+        const delta = value.choices?.[0]?.delta
+        // console.log('delta', delta)
+        if (!delta)
+          continue
 
-      if (delta.tool_calls) {
-        hasToolCalls = true
+        if (delta.tool_calls) {
+          hasToolCalls = true
 
-        break // 发现tool_calls，提前退出，交给handleFunctionCall处理
+          break // 发现tool_calls，提前退出，交给handleFunctionCall处理
+        }
       }
+      // console.log('hasToolCalls', hasToolCalls)
+      if (hasToolCalls)
+        return await this.handleFunctionCall(messages, streamIter, peekedParts, input.provider)
+
+      const restream = this.restream(peekedParts, streamIter)
+      return { stream: restream }
     }
+    catch (err) {
+      console.error('❌ askLLM 出错:', err)
 
-    if (hasToolCalls)
-      return await this.handleFunctionCall(messages, streamIter, peekedParts, input.provider)
-
-    // console.log('11111111')
-    const restream = this.restream(peekedParts, streamIter)
-    return { stream: restream }
+      return { stream: this.createErrorStream(err) }
+    }
   }
 
   private async *restream(peeked: any[], iter: AsyncIterator<any>) {
-    // console.log('2222222')
+    // for (const part of peeked) {
+    //    //console.log('peeked part:', part);
+    //   yield part
+    // }
+    // for await (const part of iter) {
+    //    //console.log('iter part:', part);
+    //   yield part
+    // }
+
+    let fullText = '' // 用来拼接完整内容
+
     for (const part of peeked) {
-      // console.log('peeked part:', part);
+      const delta = part.choices?.[0]?.delta
+      if (delta?.content)
+        fullText += delta.content
+      // console.log("peeked content:", delta.content, "| full:", fullText);
+
       yield part
     }
+
     for await (const part of iter) {
-      // console.log('iter part:', part);
+      const delta = part.choices?.[0]?.delta
+      if (delta?.content)
+        fullText += delta.content
+      // console.log("iter content:", delta.content, "| full:", fullText);
+
       yield part
     }
   }
@@ -149,7 +175,16 @@ class LLMService {
       throw new Error('handleFunctionCall: 未检测到 toolCalls')
 
     // console.log('handleToolCalls before')
-    const toolMessages = await handleToolCalls(toolCalls)
+    let toolMessages
+    try {
+      toolMessages = await handleToolCalls(toolCalls) // 这里内部 for 循环调用各个工具
+    }
+    catch (err: any) {
+      // console.log('捕获到异常:', err.message);
+      // 调用 createErrorStream
+      return { stream: this.createErrorStream(err) }
+    }
+    // const toolMessages = await handleToolCalls(toolCalls)
     // console.log('handleToolCalls after')
 
     const fullMessages = [
@@ -177,6 +212,27 @@ class LLMService {
     // }
 
     return { stream }
+  }
+
+  createErrorStream(err: Error): Readable {
+    const errorStream = new Readable({ objectMode: true, read() {} })
+    errorStream.push({
+      id: `chatcmpl-error-${Date.now()}`,
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: 'error-tool',
+      choices: [
+        {
+          index: 0,
+          delta: { content: `[ERR] ${err.message}` },
+          logprobs: null,
+          finish_reason: 'error',
+        },
+      ],
+    })
+
+    errorStream.push(null)
+    return errorStream
   }
 
   async balance() {

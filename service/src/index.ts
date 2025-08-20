@@ -43,9 +43,7 @@ interface CustomDelta {
 
 router.post('/llm/ask', auth, async (req, res) => {
   try {
-    // console.log('/llm/ask......')
-    const { provider, prompt, history = [], options = {}, systemMessage } = req.body
-    const parentMessageId: string | null = options?.parentMessageId ?? null
+    const { provider, prompt, history = [], options = {}, systemMessage, conversationId } = req.body
 
     if (!provider || !prompt)
       return res.status(400).json({ status: 'Fail', message: 'provider 和 prompt 不能为空' })
@@ -56,8 +54,8 @@ router.post('/llm/ask', auth, async (req, res) => {
     if (systemMessage)
       finalHistory.push({ role: 'system', content: systemMessage })
 
-    if (parentMessageId && messageStore.has(parentMessageId)) {
-      const old = messageStore.get(parentMessageId)!
+    if (conversationId && messageStore.has(conversationId)) {
+      const old = messageStore.get(conversationId)!
       finalHistory = [...finalHistory, ...old.filter(m => m.role !== 'system')]
     }
 
@@ -67,17 +65,16 @@ router.post('/llm/ask', auth, async (req, res) => {
     res.setHeader('Connection', 'keep-alive')
 
     // 执行 LLM 调用
-    // console.log('11111111111')
-    const { stream, broker, providerAddress } = await llmService.ask({
+    const { stream } = await llmService.ask({
       provider,
       prompt,
       history: [...finalHistory],
     })
-    // console.log('22222222222')
-    const content = ''
-    const id = stream.id
+    let content = ''
 
     for await (const chunk of stream) {
+      const delta = chunk.choices?.[0]?.delta?.content || ''
+      content += delta
       const jsonStr = JSON.stringify(chunk)
       // console.log('[Stream Chunk]', jsonStr);
 
@@ -89,13 +86,16 @@ router.post('/llm/ask', auth, async (req, res) => {
     res.write('data: [DONE]\n\n')
     res.end()
 
+    // console.log('prompt', prompt)
+    // console.log('assistant', content)
     // 保存历史
     const newHistory: ChatMessage[] = [
       ...finalHistory,
       { role: 'user', content: prompt },
       { role: 'assistant', content },
     ]
-    messageStore.set(id, newHistory)
+    // console.log('newHistory', newHistory)
+    messageStore.set(conversationId, newHistory)
   }
   catch (error: any) {
     res.write(`event: error\ndata: ${JSON.stringify({ message: error.message || '内部错误' })}\n\n`)
@@ -106,7 +106,6 @@ router.post('/llm/ask', auth, async (req, res) => {
 router.get('/llm/models', auth, async (_, res) => {
   try {
     const models = await llmService.listModels()
-    // console.log('123123')
     const modelsSafe = convertBigIntToString(models)
     res.json({ status: 'Success', data: modelsSafe })
   }

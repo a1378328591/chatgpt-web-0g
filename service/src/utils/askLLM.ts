@@ -23,6 +23,7 @@ export const getBrokerBalance = async (signer: Wallet): Promise<string> => {
   const broker = await createZGComputeNetworkBroker(signer)
   try {
     const account = await broker.ledger.getLedger()
+    // console.log('account', account)
     const [balance, locked] = account.ledgerInfo
     // console.log(`
     //   Balance: ${ethers.formatEther(balance)} OG
@@ -76,6 +77,7 @@ export const askLLM = async (
 ) => {
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [...history, { role: 'user', content: inputParam }]
   const broker = await createZGComputeNetworkBroker(signer)
+  const account = await broker.ledger.getLedger()
   const { endpoint, model } = await broker.inference.getServiceMetadata(providerAddress)
   await broker.inference.acknowledgeProviderSigner(providerAddress)
   const jsonString = JSON.stringify(messages)
@@ -87,6 +89,9 @@ export const askLLM = async (
     apiKey: '',
   })
   // console.log('--------------------------------------------------')
+  // console.log('tools', tools)
+  // console.log('providerAddress', providerAddress)
+  // console.log('history:', history)
   // console.log('messages', messages)
   // console.log('--------------------------------------------------')
   const stream = await openai.chat.completions.create(
@@ -96,6 +101,8 @@ export const askLLM = async (
       stream: true,
       tool_choice: 'auto',
       tools,
+      temperature: 0.3,
+      top_p: 1,
     },
     {
       headers: {

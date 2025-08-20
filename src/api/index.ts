@@ -60,6 +60,11 @@ export function fetchChatAPIProcess<T = any>(params: {
   const settingStore = useSettingStore()
   const modelStore = useModelStore()
 
+  const hash = window.location.hash // #/chat/1755670460056
+  const parts = hash.split('/')
+  // 从 URL 取 conversationId，如果 params.options.conversationId 已经传了，就优先用传入的
+  const conversationId = parts.length > 2 ? parts[2] : null
+
   const data: Record<string, any> = {
     prompt: params.prompt,
     options: params.options,
@@ -67,6 +72,7 @@ export function fetchChatAPIProcess<T = any>(params: {
     temperature: settingStore.temperature,
     top_p: settingStore.top_p,
     provider: modelStore.selectedModel?.provider,
+    conversationId,
   }
 
   return post<T>({
